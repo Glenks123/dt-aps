@@ -1,30 +1,22 @@
-try:
-    import cv2
-    import pyfirmata
-except:
-    import pip
-    packages = ['cv2', 'pyfirmata']
-    for package in packages:
-        pip.main(['install', 'package'])
-
-    import cv2
-    import pyfirmata
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+import RPi.GPIO as GPIO
+import cv2
+import time
 
 
-# Initiate communicatino with Arduino
-board = pyfirmata.Arduino('COM3')
-print('Communication Successfully started')
+BUZZER_PIN = 17
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(BUZZER_PIN, GPIO.OUT)
+buzzer = GPIO.PWM(BUZZER_PIN, 1000) # Set frequency to 1 Khz
 
-PIEZO_PIN = board.get_pin('d:11:p')
-
+camera = PiCamera()
+camera.resolution = (320, 240)
+camera.framerate = 30
+rawCapture = PiRGBArray(camera, size=(320, 240))
+time.sleep(0.1)
 
 thres = 0.7
-
-##img = cv2.imread('face.png')
-cap = cv2.VideoCapture(2)
-cap.set(3, 1280)
-cap.set(4, 720)
-cap.set(10, 70)
 
 classNames = []
 classFile = 'coco.names'
@@ -41,22 +33,23 @@ net.setInputScale(1.0 / 127.5)
 net.setInputMean((127.5, 127.5, 127.5))
 net.setInputSwapRB(True)
 
-while True:
-    success, img = cap.read()
+for frame in camera.capture_continuous(rawCapture, format='bgr', use_video_port=True):
+    image = frame.array
 
-    classIds, confs, bbox = net.detect(img, confThreshold=thres)
+    classIds, confs, bbox = net.detect(image, confThreshold=thres)
 
     if len(classIds) != 0:
         for classId, confidence, box in zip(classIds.flatten(), confs.flatten(), bbox):
-            cv2.rectangle(img, box, color=(0, 255, 0), thickness=2)  # green
-            cv2.putText(img, classNames[classId - 1].upper(), (box[0] + 10,
+            cv2.rectangle(image, box, color=(0, 255, 0), thickness=2)  # green
+            cv2.putText(image, classNames[classId - 1].upper(), (box[0] + 10,
                         box[1] + 30), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
 
             if classId == 77:
-                PIEZO_PIN.write(0.9)
-                board.pass_time(1)
-                PIEZO_PIN.write(0)
-                board.pass_time(0.5)
+                buzzer.start(10)
+            else:
+                buzzer.stop()
+                
+    rawCapture.truncate(0)
 
-    cv2.imshow('Output', img)
+    cv2.imshow('Output', image)
     cv2.waitKey(1)
