@@ -49,7 +49,11 @@ for frame in camera.capture_continuous(rawCapture, format='bgr', use_video_port=
             else:
                 buzzer.stop()
                 
-    rawCapture.truncate(0)
 
-    cv2.imshow('Output', image)
-    cv2.waitKey(1)
+    cv2.imshow('Frame', image)
+    key = cv2.waitKey(1) & 0xFF
+    
+    rawCapture.truncate(0)
+    
+    if key == ord('q'):
+        break
